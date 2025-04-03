@@ -1,6 +1,11 @@
 // Google AI API proxy for Deno
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 
+// Get API key from request header or environment variable
+function getApiKey(req: Request): string | null {
+  return req.headers.get("x-api-key") || Deno.env.get("GOOGLE_API_KEY") || null;
+}
+
 const GOOGLE_API_BASE = "https://generativelanguage.googleapis.com";
 
 async function handler(req: Request): Promise<Response> {
@@ -29,8 +34,15 @@ async function handler(req: Request): Promise<Response> {
   }
 
   try {
-    // Forward all requests to Google AI API
-    const targetUrl = `${GOOGLE_API_BASE}${url.pathname}`;
+    // Forward all requests to Google AI API with API key
+    const apiKey = getApiKey(req);
+    if (!apiKey) {
+      return new Response(JSON.stringify({
+        error: "API key required via x-api-key header or GOOGLE_API_KEY environment variable"
+      }), { status: 400 });
+    }
+    
+    const targetUrl = `${GOOGLE_API_BASE}${url.pathname}?key=${apiKey}`;
     const apiResponse = await fetch(targetUrl, {
       method: req.method,
       headers: req.headers,
