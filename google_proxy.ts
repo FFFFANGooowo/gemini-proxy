@@ -96,62 +96,10 @@ async function handler(req: Request): Promise<Response> {
       });
     }
 
-    // Enhanced streaming response handling
-    if (normalizedPath.includes('streamGenerateContent') || 
-        req.headers.get('accept')?.includes('text/event-stream')) {
-      console.log('Processing streaming response for:', normalizedPath);
-      
-      // Log response headers for debugging
-      console.log('Original response headers:', [...apiResponse.headers.entries()]);
-      
-      // Clone all original headers
-      const responseHeaders = new Headers(apiResponse.headers);
-      
-      // Ensure proper SSE headers
-      if (!responseHeaders.has('Content-Type')) {
-        responseHeaders.set('Content-Type', 'text/event-stream');
-      }
-      
-      // Add CORS headers
-      responseHeaders.set('Access-Control-Allow-Origin', '*');
-      responseHeaders.set('Access-Control-Expose-Headers', '*');
-      
-      // Create pass-through stream with error handling
-      const stream = new ReadableStream({
-        async start(controller) {
-          const reader = apiResponse.body?.getReader();
-          if (!reader) {
-            controller.close();
-            return;
-          }
-          
-          try {
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) break;
-              controller.enqueue(value);
-            }
-            controller.close();
-          } catch (error) {
-            console.error('Stream error:', error);
-            controller.error(error);
-          }
-        }
-      });
-      
-      return new Response(stream, {
-        status: apiResponse.status,
-        headers: responseHeaders
-      });
-    }
-
-    // Preserve all original headers and add CORS
+    // Complete passthrough of original response
     const responseHeaders = new Headers(apiResponse.headers);
     responseHeaders.set('Access-Control-Allow-Origin', '*');
-    responseHeaders.set('Referrer-Policy', 'no-referrer');
-    responseHeaders.set('Access-Control-Expose-Headers', '*');
-
-    // Return the API response with original content-type
+    
     return new Response(apiResponse.body, {
       status: apiResponse.status,
       headers: responseHeaders
