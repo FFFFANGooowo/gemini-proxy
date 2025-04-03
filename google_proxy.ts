@@ -129,6 +129,14 @@ async function handler(req: Request): Promise<Response> {
       console.log('First response chunk:', firstChunk ? new TextDecoder().decode(firstChunk) : 'Empty');
       reader.releaseLock();
       
+      // Convert JSON response to SSE format
+      const sseTransform = new TransformStream({
+        transform(chunk, controller) {
+          const text = new TextDecoder().decode(chunk);
+          controller.enqueue(new TextEncoder().encode(`data: ${text}\n\n`));
+        }
+      });
+      
       const responseHeaders = new Headers({
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
@@ -136,24 +144,9 @@ async function handler(req: Request): Promise<Response> {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Expose-Headers': '*'
       });
-      // Copy original headers except those we explicitly set
-      apiResponse.headers.forEach((value, key) => {
-        if (!responseHeaders.has(key)) {
-          responseHeaders.set(key, value);
-        }
-      });
       
       return new Response(
-        new ReadableStream({
-          start(controller) {
-            controller.enqueue(firstChunk);
-            readable.pipeTo(new WritableStream({
-              write(chunk) { controller.enqueue(chunk); },
-              close() { controller.close(); },
-              abort(err) { console.error('Stream aborted:', err); }
-            }));
-          }
-        }),
+        readable.pipeThrough(sseTransform),
         {
           status: apiResponse.status,
           headers: responseHeaders
