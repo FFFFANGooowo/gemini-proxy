@@ -129,11 +129,40 @@ async function handler(req: Request): Promise<Response> {
       console.log('First response chunk:', firstChunk ? new TextDecoder().decode(firstChunk) : 'Empty');
       reader.releaseLock();
       
-      // Convert JSON response to SSE format
+      // Convert Google API response to OpenAI-compatible SSE format
       const sseTransform = new TransformStream({
-        transform(chunk, controller) {
+        async transform(chunk, controller) {
           const text = new TextDecoder().decode(chunk);
-          controller.enqueue(new TextEncoder().encode(`data: ${text}\n\n`));
+          try {
+            const googleResp = JSON.parse(text);
+            
+            // Transform to OpenAI format
+            const openaiResp = {
+              id: `chatcmpl-${Math.random().toString(36).slice(2)}`,
+              object: 'chat.completion.chunk',
+              created: Math.floor(Date.now()/1000),
+              model: googleResp.modelVersion || 'gemini-2.0-flash-exp',
+              choices: (googleResp.candidates || []).map((candidate, index) => ({
+                index,
+                delta: {
+                  role: candidate.content?.role || 'assistant',
+                  content: candidate.content?.parts?.[0]?.text || ''
+                },
+                finish_reason: candidate.finishReason?.toLowerCase() || null,
+                logprobs: null
+              }))
+            };
+            
+            if (openaiResp.choices.length > 0) {
+              controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(openaiResp)}\n\n`));
+            }
+          } catch (e) {
+            console.error('Error transforming response:', e);
+          }
+        },
+        flush(controller) {
+          // Send SSE end marker
+          controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
         }
       });
       
