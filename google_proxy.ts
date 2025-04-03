@@ -13,7 +13,6 @@ function getApiKey(req: Request): string {
 }
 
 const GOOGLE_API_BASE = "https://generativelanguage.googleapis.com";
-const API_PATH = "/v1beta/models/gemini-2.0-flash:generateContent";
 
 async function handler(req: Request): Promise<Response> {
   const url = new URL(req.url);
@@ -34,50 +33,19 @@ async function handler(req: Request): Promise<Response> {
     return new Response(null, {
       headers: {
         "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type"
-      }
-    });
-  }
-
-  // Allow GET requests to models endpoint (handle with/without leading slash)
-  if (req.method === "GET" && (url.pathname === "/v1beta/models" || url.pathname === "v1beta/models")) {
-    const apiKey = getApiKey(req);
-    const modelsUrl = `${GOOGLE_API_BASE}${url.pathname}?key=${apiKey}`;
-    const apiResponse = await fetch(modelsUrl, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      }
-    });
-    return new Response(apiResponse.body, {
-      status: apiResponse.status,
-      headers: {
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*"
-      }
-    });
-  }
-
-  // Only allow POST requests for other endpoints
-  if (req.method !== "POST") {
-    return new Response("Method Not Allowed", { 
-      status: 405,
-      headers: {
-        "Access-Control-Allow-Origin": "*"
+        "Access-Control-Allow-Methods": "*",
+        "Access-Control-Allow-Headers": "*"
       }
     });
   }
 
   try {
-    // Forward the request to Google AI API
+    // Forward all requests to Google AI API
     const apiKey = getApiKey(req);
-    const url = `${GOOGLE_API_BASE}${API_PATH}?key=${apiKey}`;
-    const apiResponse = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+    const targetUrl = `${GOOGLE_API_BASE}${url.pathname}?key=${apiKey}`;
+    const apiResponse = await fetch(targetUrl, {
+      method: req.method,
+      headers: req.headers,
       body: req.body,
     });
 
