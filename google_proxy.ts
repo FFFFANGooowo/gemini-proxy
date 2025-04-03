@@ -76,10 +76,23 @@ async function handler(req: Request): Promise<Response> {
       });
     }
 
-    // Bypass proxy completely for streaming responses
+    // Handle streaming responses with TransformStream
     if (url.pathname.includes('streamGenerateContent') || 
         req.headers.get('accept')?.includes('text/event-stream')) {
-      return apiResponse;
+      const responseHeaders = new Headers(apiResponse.headers);
+      responseHeaders.set('Access-Control-Allow-Origin', '*');
+      
+      return new Response(
+        apiResponse.body?.pipeThrough(new TransformStream({
+          transform(chunk, controller) {
+            controller.enqueue(chunk);
+          }
+        })),
+        {
+          status: apiResponse.status,
+          headers: responseHeaders
+        }
+      );
     }
 
     // Preserve all original headers and add CORS
