@@ -107,11 +107,27 @@ async function handler(req: Request): Promise<Response> {
       });
     }
 
-    // Complete passthrough of original response with only CORS header added
+    // Handle streaming responses with raw pass-through
     const responseHeaders = new Headers(apiResponse.headers);
     responseHeaders.set('Access-Control-Allow-Origin', '*');
     
-    // Create a direct pass-through of the original response
+    if (url.pathname.includes('streamGenerateContent') && 
+        url.searchParams.get('alt') === 'sse') {
+      responseHeaders.set('Content-Type', 'text/event-stream');
+      responseHeaders.set('Cache-Control', 'no-cache');
+      responseHeaders.set('Connection', 'keep-alive');
+      
+      // Create raw pass-through stream without any processing
+      const { readable, writable } = new TransformStream();
+      apiResponse.body?.pipeTo(writable);
+      
+      return new Response(readable, {
+        status: apiResponse.status,
+        headers: responseHeaders
+      });
+    }
+    
+    // Non-streaming response
     return new Response(apiResponse.body, {
       status: apiResponse.status,
       headers: responseHeaders
