@@ -67,7 +67,26 @@ async function handler(req: Request): Promise<Response> {
     // Check if the response is OK
     if (!apiResponse.ok) {
       const error = await apiResponse.text();
-      return new Response(error, { status: apiResponse.status });
+      return new Response(error, { 
+        status: apiResponse.status,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*"
+        }
+      });
+    }
+
+    // Handle streaming responses
+    if (url.pathname.includes('streamGenerateContent')) {
+      return new Response(apiResponse.body, {
+        status: apiResponse.status,
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          "Connection": "keep-alive",
+          "Access-Control-Allow-Origin": "*"
+        }
+      });
     }
 
     // Preserve all original headers and add CORS
