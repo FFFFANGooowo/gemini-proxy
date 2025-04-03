@@ -120,70 +120,29 @@ async function handler(req: Request): Promise<Response> {
         url.searchParams.get('alt') === 'sse') {
       console.log('Streaming response headers:', [...apiResponse.headers.entries()]);
       
-      const { readable, writable } = new TransformStream();
-      apiResponse.body?.pipeTo(writable).catch(e => console.error('Stream error:', e));
-      
-      // Log first chunk of response for verification
-      const reader = readable.getReader();
-      const { value: firstChunk } = await reader.read();
-      console.log('First response chunk:', firstChunk ? new TextDecoder().decode(firstChunk) : 'Empty');
-      reader.releaseLock();
-      
-      // Convert Google API response to OpenAI-compatible SSE format
+      // Directly pipe the response with SSE wrapping
       const sseTransform = new TransformStream({
-        async transform(chunk, controller) {
-          const text = new TextDecoder().decode(chunk);
-          try {
-            const googleResp = JSON.parse(text);
-            
-            // Transform to OpenAI format
-            const openaiResp = {
-              id: `chatcmpl-${Math.random().toString(36).slice(2)}`,
-              object: 'chat.completion.chunk',
-              created: Math.floor(Date.now()/1000),
-              model: googleResp.modelVersion || 'gemini-2.0-flash-exp',
-              choices: (googleResp.candidates || []).map((candidate, index) => ({
-                index,
-                delta: {
-                  role: candidate.content?.role || 'assistant',
-                  content: candidate.content?.parts?.[0]?.text || ''
-                },
-                finish_reason: candidate.finishReason?.toLowerCase() || null,
-                logprobs: null
-              }))
-            };
-            
-            if (openaiResp.choices.length > 0) {
-              controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(openaiResp)}\n\n`));
-            }
-          } catch (e) {
-            console.error('Error transforming response:', e);
-          }
+        transform(chunk, controller) {
+          // Pure pass-through with SSE prefix
+          controller.enqueue(new TextEncoder().encode(`data: ${new TextDecoder().decode(chunk)}\n\n`));
         },
         flush(controller) {
-          // Send formal SSE end marker  
-          // Send formal completion event first
-          controller.enqueue(new TextEncoder().encode(
-            'data: {"id":"chatcmpl-end","choices":[{"finish_reason":"stop"}]}\n\n'
-          ));
-          // Then send [DONE] marker
+          // Optional: Send SSE end marker
           controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
         }
       });
       
-      const responseHeaders = new Headers({
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Expose-Headers': '*'
-      });
-      
       return new Response(
-        readable.pipeThrough(sseTransform),
+        apiResponse.body?.pipeThrough(sseTransform),
         {
           status: apiResponse.status,
-          headers: responseHeaders
+          headers: {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Expose-Headers': '*'
+          }
         }
       );
     }
