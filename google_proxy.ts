@@ -123,8 +123,14 @@ async function handler(req: Request): Promise<Response> {
       // Directly pipe the response with SSE wrapping
       const sseTransform = new TransformStream({
         transform(chunk, controller) {
-          // Pure pass-through with SSE prefix
-          controller.enqueue(new TextEncoder().encode(`data: ${new TextDecoder().decode(chunk)}\n\n`));
+          const text = new TextDecoder().decode(chunk).trim();
+          // Skip empty chunks
+          if (!text) return;
+          
+          // Handle both JSON objects and arrays
+          if (text.startsWith('[') || text.startsWith('{')) {
+            controller.enqueue(new TextEncoder().encode(`data: ${text}\n\n`));
+          }
         },
         flush(controller) {
           // Optional: Send SSE end marker
