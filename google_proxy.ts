@@ -40,8 +40,8 @@ async function handler(req: Request): Promise<Response> {
     });
   }
 
-  // Allow GET requests to /v1beta/models
-  if (req.method === "GET" && url.pathname === "/v1beta/models") {
+  // Allow GET requests to models endpoint (handle with/without leading slash)
+  if (req.method === "GET" && (url.pathname === "/v1beta/models" || url.pathname === "v1beta/models")) {
     const apiKey = getApiKey(req);
     const modelsUrl = `${GOOGLE_API_BASE}${url.pathname}?key=${apiKey}`;
     const apiResponse = await fetch(modelsUrl, {
