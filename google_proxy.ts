@@ -57,9 +57,27 @@ async function handler(req: Request): Promise<Response> {
         }
       });
     }
-    // Normalize path by removing duplicate slashes
-    const normalizedPath = url.pathname.replace(/\/+/g, '/');
-    const targetUrl = `${GOOGLE_API_BASE}${normalizedPath}?key=${apiKey}`;
+    // Strict path normalization
+    const normalizedPath = url.pathname
+      .replace(/\/+/g, '/')  // Remove duplicate slashes
+      .replace(/^\/+/, '/'); // Ensure single leading slash
+      
+    // Validate API key format
+    if (!/^AIza[0-9A-Za-z-_]{35}$/.test(apiKey)) {
+      return new Response(JSON.stringify({
+        error: "Invalid API key format",
+        received_key: apiKey
+      }), {
+        status: 400,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*"
+        }
+      });
+    }
+    
+    const targetUrl = new URL(`${GOOGLE_API_BASE}${normalizedPath}`);
+    targetUrl.searchParams.set('key', apiKey);
     const apiResponse = await fetch(targetUrl, {
       method: req.method,
       headers: req.headers,
