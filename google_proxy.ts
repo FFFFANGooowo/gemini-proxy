@@ -40,7 +40,26 @@ async function handler(req: Request): Promise<Response> {
     });
   }
 
-  // Only allow POST requests
+  // Allow GET requests to /v1beta/models
+  if (req.method === "GET" && url.pathname === "/v1beta/models") {
+    const apiKey = getApiKey(req);
+    const modelsUrl = `${GOOGLE_API_BASE}${url.pathname}?key=${apiKey}`;
+    const apiResponse = await fetch(modelsUrl, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      }
+    });
+    return new Response(apiResponse.body, {
+      status: apiResponse.status,
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*"
+      }
+    });
+  }
+
+  // Only allow POST requests for other endpoints
   if (req.method !== "POST") {
     return new Response("Method Not Allowed", { 
       status: 405,
