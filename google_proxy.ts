@@ -78,15 +78,15 @@ async function handler(req: Request): Promise<Response> {
     }
 
     // Handle streaming responses
-    if (url.pathname.includes('streamGenerateContent')) {
+    if (url.pathname.includes('streamGenerateContent') || 
+        req.headers.get('accept')?.includes('text/event-stream')) {
+      const responseHeaders = new Headers(apiResponse.headers);
+      responseHeaders.set('Access-Control-Allow-Origin', '*');
+      responseHeaders.set('Access-Control-Expose-Headers', '*');
+      
       return new Response(apiResponse.body, {
         status: apiResponse.status,
-        headers: {
-          "Content-Type": "text/event-stream",
-          "Cache-Control": "no-cache",
-          "Connection": "keep-alive",
-          "Access-Control-Allow-Origin": "*"
-        }
+        headers: responseHeaders
       });
     }
 
