@@ -57,7 +57,6 @@ async function handler(req: Request): Promise<Response> {
         }
       });
     }
-    
     const targetUrl = `${GOOGLE_API_BASE}${url.pathname}?key=${apiKey}`;
     const apiResponse = await fetch(targetUrl, {
       method: req.method,
@@ -77,40 +76,10 @@ async function handler(req: Request): Promise<Response> {
       });
     }
 
-    // Handle streaming responses - preserve all original headers
+    // Bypass proxy completely for streaming responses
     if (url.pathname.includes('streamGenerateContent') || 
         req.headers.get('accept')?.includes('text/event-stream')) {
-      // Clone all original headers
-      const responseHeaders = new Headers(apiResponse.headers);
-      
-      // Only add CORS headers without modifying others
-      responseHeaders.set('Access-Control-Allow-Origin', '*');
-      responseHeaders.set('Access-Control-Expose-Headers', '*');
-      
-      // Create a pass-through stream to ensure no data modification
-      const stream = new ReadableStream({
-        start(controller) {
-          const reader = apiResponse.body!.getReader();
-          
-          function push() {
-            reader.read().then(({done, value}) => {
-              if (done) {
-                controller.close();
-                return;
-              }
-              controller.enqueue(value);
-              push();
-            });
-          }
-          
-          push();
-        }
-      });
-      
-      return new Response(stream, {
-        status: apiResponse.status,
-        headers: responseHeaders
-      });
+      return apiResponse;
     }
 
     // Preserve all original headers and add CORS
