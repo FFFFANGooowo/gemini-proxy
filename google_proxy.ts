@@ -87,6 +87,17 @@ async function handler(req: Request): Promise<Response> {
     // Check if the response is OK
     if (!apiResponse.ok) {
       const error = await apiResponse.text();
+      console.error('API Error:', {
+        status: apiResponse.status,
+        headers: [...apiResponse.headers.entries()],
+        error: error,
+        request: {
+          url: targetUrl.toString(),
+          method: req.method,
+          headers: [...req.headers.entries()],
+          body: await req.text().catch(() => 'Unable to read request body')
+        }
+      });
       return new Response(error, { 
         status: apiResponse.status,
         headers: {
@@ -96,17 +107,11 @@ async function handler(req: Request): Promise<Response> {
       });
     }
 
-    // Force SSE content-type for streaming responses
+    // Complete passthrough of original response with only CORS header added
     const responseHeaders = new Headers(apiResponse.headers);
     responseHeaders.set('Access-Control-Allow-Origin', '*');
     
-    if (url.pathname.includes('streamGenerateContent') && 
-        url.searchParams.get('alt') === 'sse') {
-      responseHeaders.set('Content-Type', 'text/event-stream');
-      responseHeaders.set('Cache-Control', 'no-cache');
-      responseHeaders.set('Connection', 'keep-alive');
-    }
-    
+    // Create a direct pass-through of the original response
     return new Response(apiResponse.body, {
       status: apiResponse.status,
       headers: responseHeaders
