@@ -96,9 +96,16 @@ async function handler(req: Request): Promise<Response> {
       });
     }
 
-    // Complete passthrough of original response
+    // Force SSE content-type for streaming responses
     const responseHeaders = new Headers(apiResponse.headers);
     responseHeaders.set('Access-Control-Allow-Origin', '*');
+    
+    if (url.pathname.includes('streamGenerateContent') && 
+        url.searchParams.get('alt') === 'sse') {
+      responseHeaders.set('Content-Type', 'text/event-stream');
+      responseHeaders.set('Cache-Control', 'no-cache');
+      responseHeaders.set('Connection', 'keep-alive');
+    }
     
     return new Response(apiResponse.body, {
       status: apiResponse.status,
