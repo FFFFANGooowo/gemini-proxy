@@ -1,11 +1,12 @@
 // Google AI API proxy for Deno
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 
-// Get API key from URL param, request header or environment variable
+// Get API key from URL param, request headers or environment variable
 function getApiKey(req: Request): string | null {
   const url = new URL(req.url);
   return url.searchParams.get("key") || 
-         req.headers.get("x-api-key") || 
+         req.headers.get("x-api-key") ||
+         req.headers.get("x-goog-api-key") || 
          Deno.env.get("GOOGLE_API_KEY") || 
          null;
 }
