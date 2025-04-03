@@ -138,17 +138,16 @@ async function handler(req: Request): Promise<Response> {
         }
       });
       
+      // Preserve original headers and add CORS
+      const responseHeaders = new Headers(apiResponse.headers);
+      responseHeaders.set('Access-Control-Allow-Origin', '*');
+      responseHeaders.set('Access-Control-Expose-Headers', '*');
+      
       return new Response(
         apiResponse.body?.pipeThrough(sseTransform),
         {
           status: apiResponse.status,
-          headers: {
-            'Content-Type': 'text/event-stream',
-            'Cache-Control': 'no-cache',
-            'Connection': 'keep-alive',
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Expose-Headers': '*'
-          }
+          headers: responseHeaders
         }
       );
     }
