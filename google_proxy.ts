@@ -77,14 +77,37 @@ async function handler(req: Request): Promise<Response> {
       });
     }
 
-    // Handle streaming responses
+    // Handle streaming responses - preserve all original headers
     if (url.pathname.includes('streamGenerateContent') || 
         req.headers.get('accept')?.includes('text/event-stream')) {
+      // Clone all original headers
       const responseHeaders = new Headers(apiResponse.headers);
+      
+      // Only add CORS headers without modifying others
       responseHeaders.set('Access-Control-Allow-Origin', '*');
       responseHeaders.set('Access-Control-Expose-Headers', '*');
       
-      return new Response(apiResponse.body, {
+      // Create a pass-through stream to ensure no data modification
+      const stream = new ReadableStream({
+        start(controller) {
+          const reader = apiResponse.body!.getReader();
+          
+          function push() {
+            reader.read().then(({done, value}) => {
+              if (done) {
+                controller.close();
+                return;
+              }
+              controller.enqueue(value);
+              push();
+            });
+          }
+          
+          push();
+        }
+      });
+      
+      return new Response(stream, {
         status: apiResponse.status,
         headers: responseHeaders
       });
