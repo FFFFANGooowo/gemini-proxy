@@ -35,11 +35,22 @@ async function handler(req: Request): Promise<Response> {
 
   try {
     // Forward all requests to Google AI API with API key
+    // Debug request headers
+    console.log('Received headers:', [...req.headers.entries()]);
+    
     const apiKey = getApiKey(req);
     if (!apiKey) {
       return new Response(JSON.stringify({
-        error: "API key required via x-api-key header or GOOGLE_API_KEY environment variable"
-      }), { status: 400 });
+        error: "API key required via x-api-key header or GOOGLE_API_KEY environment variable",
+        received_headers: [...req.headers.entries()],
+        env_key_available: !!Deno.env.get("GOOGLE_API_KEY")
+      }), { 
+        status: 400,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*"
+        }
+      });
     }
     
     const targetUrl = `${GOOGLE_API_BASE}${url.pathname}?key=${apiKey}`;
