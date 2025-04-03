@@ -161,7 +161,12 @@ async function handler(req: Request): Promise<Response> {
           }
         },
         flush(controller) {
-          // Send SSE end marker
+          // Send formal SSE end marker  
+          // Send formal completion event first
+          controller.enqueue(new TextEncoder().encode(
+            'data: {"id":"chatcmpl-end","choices":[{"finish_reason":"stop"}]}\n\n'
+          ));
+          // Then send [DONE] marker
           controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
         }
       });
