@@ -107,18 +107,18 @@ async function handler(req: Request): Promise<Response> {
       });
     }
 
-    // Bypass all processing for streaming responses
-    if (url.pathname.includes('streamGenerateContent') && 
-        url.searchParams.get('alt') === 'sse') {
-      // Return the original response with only CORS header added
-      const newResponse = new Response(apiResponse.body, apiResponse);
-      newResponse.headers.set('Access-Control-Allow-Origin', '*');
-      return newResponse;
-    }
-    
-    // Non-streaming response
+    // Create response with original headers and CORS
     const responseHeaders = new Headers(apiResponse.headers);
     responseHeaders.set('Access-Control-Allow-Origin', '*');
+    responseHeaders.set('Access-Control-Allow-Methods', '*');
+    responseHeaders.set('Access-Control-Allow-Headers', '*');
+    
+    // Preserve original content-type for streaming responses
+    if (url.pathname.includes('streamGenerateContent') && 
+        url.searchParams.get('alt') === 'sse') {
+      responseHeaders.set('Content-Type', apiResponse.headers.get('Content-Type') || 'text/event-stream');
+    }
+    
     return new Response(apiResponse.body, {
       status: apiResponse.status,
       headers: responseHeaders
