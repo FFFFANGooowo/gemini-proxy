@@ -40,8 +40,16 @@ async function handler(req: Request): Promise<Response> {
 
   try {
     // Forward all requests to Google AI API with API key
-    // Debug request headers
+    // Debug request headers and body
+    const requestBody = await req.text();
     console.log('Received headers:', [...req.headers.entries()]);
+    console.log('Request body:', requestBody);
+    // Recreate request body as stream
+    req = new Request(req.url, {
+      method: req.method,
+      headers: req.headers,
+      body: requestBody,
+    });
     
     const apiKey = getApiKey(req);
     if (!apiKey) {
@@ -110,16 +118,47 @@ async function handler(req: Request): Promise<Response> {
     // Complete raw pass-through for streaming responses
     if (url.pathname.includes('streamGenerateContent') && 
         url.searchParams.get('alt') === 'sse') {
+      console.log('Streaming response headers:', [...apiResponse.headers.entries()]);
+      
       const { readable, writable } = new TransformStream();
-      apiResponse.body?.pipeTo(writable);
+      apiResponse.body?.pipeTo(writable).catch(e => console.error('Stream error:', e));
       
-      const responseHeaders = new Headers(apiResponse.headers);
-      responseHeaders.set('Access-Control-Allow-Origin', '*');
+      // Log first chunk of response for verification
+      const reader = readable.getReader();
+      const { value: firstChunk } = await reader.read();
+      console.log('First response chunk:', firstChunk ? new TextDecoder().decode(firstChunk) : 'Empty');
+      reader.releaseLock();
       
-      return new Response(readable, {
-        status: apiResponse.status,
-        headers: responseHeaders
+      const responseHeaders = new Headers({
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Expose-Headers': '*'
       });
+      // Copy original headers except those we explicitly set
+      apiResponse.headers.forEach((value, key) => {
+        if (!responseHeaders.has(key)) {
+          responseHeaders.set(key, value);
+        }
+      });
+      
+      return new Response(
+        new ReadableStream({
+          start(controller) {
+            controller.enqueue(firstChunk);
+            readable.pipeTo(new WritableStream({
+              write(chunk) { controller.enqueue(chunk); },
+              close() { controller.close(); },
+              abort(err) { console.error('Stream aborted:', err); }
+            }));
+          }
+        }),
+        {
+          status: apiResponse.status,
+          headers: responseHeaders
+        }
+      );
     }
     
     // Standard response
