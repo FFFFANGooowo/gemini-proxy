@@ -28,7 +28,7 @@ async function handler(req: Request): Promise<Response> {
       headers: {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "*",
-        "Access-Control-Allow-Headers": "*"
+        "Access-Control-Allow-Headers": "x-api-key, content-type"
       }
     });
   }
