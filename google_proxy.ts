@@ -57,7 +57,9 @@ async function handler(req: Request): Promise<Response> {
         }
       });
     }
-    const targetUrl = `${GOOGLE_API_BASE}${url.pathname}?key=${apiKey}`;
+    // Normalize path by removing duplicate slashes
+    const normalizedPath = url.pathname.replace(/\/+/g, '/');
+    const targetUrl = `${GOOGLE_API_BASE}${normalizedPath}?key=${apiKey}`;
     const apiResponse = await fetch(targetUrl, {
       method: req.method,
       headers: req.headers,
@@ -76,23 +78,53 @@ async function handler(req: Request): Promise<Response> {
       });
     }
 
-    // Handle streaming responses with TransformStream
-    if (url.pathname.includes('streamGenerateContent') || 
+    // Enhanced streaming response handling
+    if (normalizedPath.includes('streamGenerateContent') || 
         req.headers.get('accept')?.includes('text/event-stream')) {
-      const responseHeaders = new Headers(apiResponse.headers);
-      responseHeaders.set('Access-Control-Allow-Origin', '*');
+      console.log('Processing streaming response for:', normalizedPath);
       
-      return new Response(
-        apiResponse.body?.pipeThrough(new TransformStream({
-          transform(chunk, controller) {
-            controller.enqueue(chunk);
+      // Log response headers for debugging
+      console.log('Original response headers:', [...apiResponse.headers.entries()]);
+      
+      // Clone all original headers
+      const responseHeaders = new Headers(apiResponse.headers);
+      
+      // Ensure proper SSE headers
+      if (!responseHeaders.has('Content-Type')) {
+        responseHeaders.set('Content-Type', 'text/event-stream');
+      }
+      
+      // Add CORS headers
+      responseHeaders.set('Access-Control-Allow-Origin', '*');
+      responseHeaders.set('Access-Control-Expose-Headers', '*');
+      
+      // Create pass-through stream with error handling
+      const stream = new ReadableStream({
+        async start(controller) {
+          const reader = apiResponse.body?.getReader();
+          if (!reader) {
+            controller.close();
+            return;
           }
-        })),
-        {
-          status: apiResponse.status,
-          headers: responseHeaders
+          
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              controller.enqueue(value);
+            }
+            controller.close();
+          } catch (error) {
+            console.error('Stream error:', error);
+            controller.error(error);
+          }
         }
-      );
+      });
+      
+      return new Response(stream, {
+        status: apiResponse.status,
+        headers: responseHeaders
+      });
     }
 
     // Preserve all original headers and add CORS
