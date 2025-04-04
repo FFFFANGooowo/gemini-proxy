@@ -120,14 +120,16 @@ async function handler(req: Request): Promise<Response> {
         url.searchParams.get('alt') === 'sse') {
       console.log('Raw SSE response headers:', [...apiResponse.headers.entries()]);
       
-      // Preserve original SSE headers
-      const headers = new Headers(apiResponse.headers);
-      if (!headers.has('Content-Type')) {
-        headers.set('Content-Type', 'text/event-stream');
-      }
+      // Preserve ALL original headers exactly
+      const headers = new Headers();
+      apiResponse.headers.forEach((value, key) => {
+        headers.set(key, value);
+      });
+      
+      // Only add CORS header without modifying anything else
       headers.set('Access-Control-Allow-Origin', '*');
       
-      // Direct pass-through for SSE
+      // Full fidelity pass-through
       return new Response(apiResponse.body, {
         status: apiResponse.status,
         headers: headers
