@@ -11,7 +11,7 @@ function getApiKey(req: Request): string | null {
          null;
 }
 
-const GOOGLE_API_BASE = "https://generativelanguage.googleapis.com";
+const GOOGLE_API_BASE = "https://generativelanguage.googleapis.com/v1beta";
 
 async function handler(req: Request): Promise<Response> {
   const url = new URL(req.url);
@@ -115,41 +115,18 @@ async function handler(req: Request): Promise<Response> {
       });
     }
 
-    // Complete raw pass-through for streaming responses
+    // Raw pass-through for streaming responses without SSE conversion
     if (url.pathname.includes('streamGenerateContent') && 
         url.searchParams.get('alt') === 'sse') {
       console.log('Streaming response headers:', [...apiResponse.headers.entries()]);
       
-      // Directly pipe the response with SSE wrapping
-      const sseTransform = new TransformStream({
-        transform(chunk, controller) {
-          const text = new TextDecoder().decode(chunk).trim();
-          // Skip empty chunks
-          if (!text) return;
-          
-          // Handle both JSON objects and arrays
-          if (text.startsWith('[') || text.startsWith('{')) {
-            controller.enqueue(new TextEncoder().encode(`data: ${text}\n\n`));
-          }
-        },
-        flush(controller) {
-          // Optional: Send SSE end marker
-          controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
-        }
-      });
-      
-      // Preserve original headers and add CORS
       const responseHeaders = new Headers(apiResponse.headers);
       responseHeaders.set('Access-Control-Allow-Origin', '*');
-      responseHeaders.set('Access-Control-Expose-Headers', '*');
       
-      return new Response(
-        apiResponse.body?.pipeThrough(sseTransform),
-        {
-          status: apiResponse.status,
-          headers: responseHeaders
-        }
-      );
+      return new Response(apiResponse.body, {
+        status: apiResponse.status,
+        headers: responseHeaders
+      });
     }
     
     // Standard response
