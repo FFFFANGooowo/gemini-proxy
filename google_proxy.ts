@@ -118,13 +118,16 @@ async function handler(req: Request): Promise<Response> {
     // Complete raw pass-through for streaming responses
     if (url.pathname.includes('streamGenerateContent') && 
         url.searchParams.get('alt') === 'sse') {
-      console.log('Raw response headers:', [...apiResponse.headers.entries()]);
+      console.log('Raw SSE response headers:', [...apiResponse.headers.entries()]);
       
-      // Minimal modification: only add CORS headers
+      // Preserve original SSE headers
       const headers = new Headers(apiResponse.headers);
+      if (!headers.has('Content-Type')) {
+        headers.set('Content-Type', 'text/event-stream');
+      }
       headers.set('Access-Control-Allow-Origin', '*');
       
-      // Complete pass-through with original body and headers
+      // Direct pass-through for SSE
       return new Response(apiResponse.body, {
         status: apiResponse.status,
         headers: headers
