@@ -1,36 +1,74 @@
-# Google AI API Deno Proxy
+# Google AI API 透明代理
 
-A simple proxy server that forwards requests to Google's AI API.
+一个用于Deno部署的Google AI API透明代理服务，完全保留原始请求和响应格式。
 
-## Setup
+## 核心特性
 
-1. Install Deno: https://deno.land/
-2. Set your Google API key as environment variable:
+✅ **完全透明的流量转发**  
+- 请求体/响应体零修改
+- 精准匹配原始API头信息
+- 原生支持SSE流式响应
+
+🔒 **安全验证**  
+- 支持多种API Key传递方式:
+  - Header (x-api-key/x-goog-api-key)
+  - URL参数 (?key=)
+  - 环境变量
+
+📊 **详细日志**  
+- 记录完整请求链路
+- 包含转发前后的URL
+- 时间戳标记
+
+## 快速开始
+
+1. **安装Deno**  
    ```bash
-   export GOOGLE_API_KEY="your-api-key-here"
+   curl -fsSL https://deno.land/x/install/install.sh | sh
    ```
-   (Windows: `set GOOGLE_API_KEY=your-api-key-here`)
 
-## Running
+2. **部署服务**  
+   ```bash
+   deno run -A google_proxy.ts
+   ```
 
+3. **发送请求**  
+   ```bash
+   curl -X POST \
+     -H "x-goog-api-key: YOUR_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"contents":"测试"}' \
+     "http://localhost:8000/v1beta/models/gemini-pro:streamGenerateContent?alt=sse" 
+   ```
+
+## 部署指南
+
+### 本地运行
 ```bash
-deno task start
+export GOOGLE_API_KEY="your_key"
+deno run --allow-net --allow-env google_proxy.ts
 ```
 
-This will:
-- Start the proxy server on port 8000
-- Require network access (--allow-net)
-- Require environment variable access (--allow-env)
+### Deno Deploy
+1. 将代码推送至GitHub仓库
+2. 在Deno Deploy创建新项目
+3. 设置环境变量:
+   ```
+   GOOGLE_API_KEY=your_key
+   ```
 
-## Usage
+## 配置说明
 
-Send POST requests to `http://localhost:8000` with your Google AI API payload.
-The proxy will forward the request to Google's API and return the response unchanged.
+### 环境变量
+| 变量名 | 说明 |
+|--------|------|
+| `GOOGLE_API_KEY` | 默认API Key |
 
-## Deployment
+### 请求选项
+- Header传递: `x-api-key` 或 `x-goog-api-key`
+- URL参数: `?key=YOUR_KEY`
 
-To deploy to Deno Deploy:
-1. Create an account at https://deno.com/deploy
-2. Connect your GitHub repository
-3. Set the GOOGLE_API_KEY as an environment variable in the Deno Deploy dashboard
-4. Deploy your project
+---
+
+> 📝 **Note**: 确保您的API Key有访问Gemini API的权限  
+> ⚠️ **Warning**: 日志会记录敏感信息，生产环境需注意
