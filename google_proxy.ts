@@ -122,10 +122,13 @@ async function handler(req: Request): Promise<Response> {
     // Complete raw pass-through for streaming responses
     if (url.pathname.includes('streamGenerateContent') && 
         url.searchParams.get('alt') === 'sse') {
-    console.log(`[${new Date().toISOString()}] Request Details:
+    // Debug SSE trigger parameters
+    console.log(`[${new Date().toISOString()}] SSE Trigger Check:
   Client URL: ${req.url}
-  Forwarded To: ${targetUrl}
-  Response Headers:`, [...apiResponse.headers.entries()]);
+  Contains streamGenerateContent: ${url.pathname.includes('streamGenerateContent')}
+  alt=sse Present: ${url.searchParams.get('alt') === 'sse'}
+  Final Target URL: ${targetUrl}
+  Request Headers:`, [...req.headers.entries()]);
       
       // Strictly control which headers are forwarded
       const headers = new Headers();
