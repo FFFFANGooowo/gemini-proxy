@@ -118,30 +118,17 @@ async function handler(req: Request): Promise<Response> {
     // Complete raw pass-through for streaming responses
     if (url.pathname.includes('streamGenerateContent') && 
         url.searchParams.get('alt') === 'sse') {
-      console.log('Streaming response headers:', [...apiResponse.headers.entries()]);
+      console.log('Raw response headers:', [...apiResponse.headers.entries()]);
       
-      // Clone the response body for logging
-      const [loggingStream, responseStream] = apiResponse.body?.tee() || [new ReadableStream(), new ReadableStream()];
+      // Minimal modification: only add CORS headers
+      const headers = new Headers(apiResponse.headers);
+      headers.set('Access-Control-Allow-Origin', '*');
       
-      // Log first chunk in background
-      (async () => {
-        const reader = loggingStream.getReader();
-        const { value: firstChunk } = await reader.read();
-        console.log('First response chunk:', firstChunk ? new TextDecoder().decode(firstChunk) : 'Empty');
-        reader.releaseLock();
-      })();
-      
-      const responseHeaders = new Headers(apiResponse.headers);
-      responseHeaders.set('Access-Control-Allow-Origin', '*');
-      responseHeaders.set('Access-Control-Expose-Headers', '*');
-      
-      return new Response(
-        responseStream,
-        {
-          status: apiResponse.status,
-          headers: responseHeaders
-        }
-      );
+      // Complete pass-through with original body and headers
+      return new Response(apiResponse.body, {
+        status: apiResponse.status,
+        headers: headers
+      });
     }
     
     // Standard response
