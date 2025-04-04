@@ -36,7 +36,7 @@ async function handler(req: Request): Promise<Response> {
       headers: {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Authorization, x-api-key, Content-Type"
+        "Access-Control-Allow-Headers": "Authorization, x-api-key, x-goog-api-key, Content-Type"
       }
     });
   }
@@ -55,16 +55,20 @@ async function handler(req: Request): Promise<Response> {
       });
     }
 
-    const targetUrl = new URL(`${GOOGLE_API_BASE}${url.pathname}`);
-    targetUrl.searchParams.set('key', apiKey);
+    // Construct target URL without API key parameter
+    const targetUrl = new URL(`${GOOGLE_API_BASE}${url.pathname}${url.search}`);
 
     // Prepare headers to forward
     const forwardHeaders = new Headers(req.headers);
     forwardHeaders.delete('Host');
+    // Remove all possible client key headers
     forwardHeaders.delete('Authorization');
     forwardHeaders.delete('x-api-key');
     forwardHeaders.delete('x-goog-api-key');
-    //forwardHeaders.set('Accept-Encoding', 'identity');
+    // Set the correct API key header
+    forwardHeaders.set('X-Goog-Api-Key', apiKey);
+
+    console.log('Forwarding Headers to Google:', [...forwardHeaders.entries()]);
 
     // Forward request
     const apiResponse = await fetch(targetUrl.toString(), {
