@@ -86,9 +86,13 @@ async function handler(req: Request): Promise<Response> {
     
     const targetUrl = new URL(`${GOOGLE_API_BASE}${normalizedPath}`);
     targetUrl.searchParams.set('key', apiKey);
+    // Prevent any transformations by intermediaries
+    const cleanHeaders = new Headers(req.headers);
+    cleanHeaders.set('Accept-Encoding', 'identity');
+    
     const apiResponse = await fetch(targetUrl, {
       method: req.method,
-      headers: req.headers,
+      headers: cleanHeaders,
       body: req.body,
     });
 
