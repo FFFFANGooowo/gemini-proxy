@@ -149,9 +149,27 @@ async function handler(req: Request): Promise<Response> {
       status: apiResponse.status,
       headers: responseHeaders
     });
-  } catch (error) {
-    console.error("Proxy error:", error);
-    return new Response("Internal Server Error", { status: 500 });
+    } catch (error) {
+      console.error("Proxy error details:", {
+        timestamp: new Date().toISOString(),
+        error: error instanceof Error ? error.stack : error,
+        request: {
+          url: req.url,
+          method: req.method,
+          headers: Object.fromEntries(req.headers.entries()),
+          body: await req.text().catch(() => 'Unable to read request body')
+        }
+      });
+      return new Response(JSON.stringify({
+        error: "Internal Server Error",
+        details: error instanceof Error ? error.message : String(error)
+      }), { 
+        status: 500,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*"
+        }
+      });
   }
 }
 
