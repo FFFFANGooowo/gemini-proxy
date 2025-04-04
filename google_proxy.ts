@@ -120,21 +120,23 @@ async function handler(req: Request): Promise<Response> {
         url.searchParams.get('alt') === 'sse') {
       console.log('Streaming response headers:', [...apiResponse.headers.entries()]);
       
-      const { readable, writable } = new TransformStream();
-      apiResponse.body?.pipeTo(writable).catch(e => console.error('Stream error:', e));
+      // Clone the response body for logging
+      const [loggingStream, responseStream] = apiResponse.body?.tee() || [new ReadableStream(), new ReadableStream()];
       
-      // Log first chunk of response for verification
-      const reader = readable.getReader();
-      const { value: firstChunk } = await reader.read();
-      console.log('First response chunk:', firstChunk ? new TextDecoder().decode(firstChunk) : 'Empty');
-      reader.releaseLock();
+      // Log first chunk in background
+      (async () => {
+        const reader = loggingStream.getReader();
+        const { value: firstChunk } = await reader.read();
+        console.log('First response chunk:', firstChunk ? new TextDecoder().decode(firstChunk) : 'Empty');
+        reader.releaseLock();
+      })();
       
       const responseHeaders = new Headers(apiResponse.headers);
       responseHeaders.set('Access-Control-Allow-Origin', '*');
       responseHeaders.set('Access-Control-Expose-Headers', '*');
       
       return new Response(
-        readable,
+        responseStream,
         {
           status: apiResponse.status,
           headers: responseHeaders
