@@ -64,7 +64,7 @@ async function handler(req: Request): Promise<Response> {
     forwardHeaders.delete('Authorization');
     forwardHeaders.delete('x-api-key');
     forwardHeaders.delete('x-goog-api-key');
-    forwardHeaders.set('Accept-Encoding', 'identity');
+    //forwardHeaders.set('Accept-Encoding', 'identity');
 
     // Forward request
     const apiResponse = await fetch(targetUrl.toString(), {
@@ -73,19 +73,66 @@ async function handler(req: Request): Promise<Response> {
       body: req.body,
     });
 
-    // Process response
-    const responseHeaders = new Headers(apiResponse.headers);
-    responseHeaders.delete('Content-Encoding');
-    responseHeaders.delete('Transfer-Encoding');
-    responseHeaders.set('Access-Control-Allow-Origin', '*');
+    // Log basic response info
+    const googleContentType = apiResponse.headers.get('Content-Type');
+    const googleStatus = apiResponse.status;
+    console.log(`Google Response Status: ${googleStatus}`);
+    console.log(`Google Response Content-Type: ${googleContentType}`);
 
-    console.log(`Response Content-Type: ${apiResponse.headers.get('Content-Type')}`);
-    
-    // Pass through response exactly as received
-    return new Response(apiResponse.body, {
-      status: apiResponse.status,
-      headers: responseHeaders
-    });
+    // Handle JSON responses specially for error debugging
+    if (googleContentType?.includes('application/json')) {
+      try {
+        const responseBodyText = await apiResponse.text();
+        console.error(`Received JSON body from Google (Status ${googleStatus}):`, responseBodyText);
+        
+        const responseHeaders = new Headers(apiResponse.headers);
+        responseHeaders.delete('Content-Encoding');
+        responseHeaders.delete('Transfer-Encoding');
+        responseHeaders.set('Access-Control-Allow-Origin', '*');
+        responseHeaders.set('Content-Type', 'application/json; charset=UTF-8');
+
+        return new Response(responseBodyText, {
+          status: googleStatus,
+          headers: responseHeaders
+        });
+      } catch (e) {
+        console.error("Error processing JSON response:", e);
+        return new Response(JSON.stringify({ 
+          error: "Failed to process Google response",
+          details: e instanceof Error ? e.message : String(e)
+        }), {
+          status: 500,
+          headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*"
+          }
+        });
+      }
+    }
+    // Handle SSE streams normally
+    else if (googleContentType?.includes('text/event-stream')) {
+      const responseHeaders = new Headers(apiResponse.headers);
+      responseHeaders.delete('Content-Encoding');
+      responseHeaders.delete('Transfer-Encoding');
+      responseHeaders.set('Access-Control-Allow-Origin', '*');
+      
+      console.log('Forwarding SSE stream response');
+      return new Response(apiResponse.body, {
+        status: apiResponse.status,
+        headers: responseHeaders
+      });
+    }
+    // Handle other response types
+    else {
+      console.warn(`Unexpected Content-Type from Google: ${googleContentType}`);
+      const responseHeaders = new Headers(apiResponse.headers);
+      responseHeaders.set('Access-Control-Allow-Origin', '*');
+      
+      return new Response(apiResponse.body, {
+        status: apiResponse.status,
+        headers: responseHeaders
+      });
+    }
 
   } catch (error) {
     console.error("Proxy error:", error);
